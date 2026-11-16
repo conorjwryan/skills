@@ -123,7 +123,7 @@ try {
 }
 ```
 
-`launchOptions` go to local `launch` or Docker `launchServer`. Docker always owns the server
+`launchOptions` go to local `launch` or the pinned Docker server browser-launch request. The full Playwright server enables the requested client loopback forwarding; Docker owns the server
 host and port; host-specific executable paths and other machine-specific options are the
 caller's responsibility. Existing `loadChromium()` and `loadBrowser(name)` exports remain
 **local-only compatibility APIs**: they neither launch Docker nor repair missing browsers.

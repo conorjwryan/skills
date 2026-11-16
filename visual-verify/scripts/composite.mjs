@@ -44,10 +44,10 @@ const html = `<html><body style="margin:0;background:#18181b">
   </div>
 </body></html>`;
 
-const { browser } = await launchBrowser("chromium");
+const { browser, where } = await launchBrowser("chromium");
 try {
 const page = await browser.newPage({ viewport: { width: 1000, height: 700 }, deviceScaleFactor: 2 });
 await page.setContent(html, { waitUntil: "networkidle" });
 await (await page.$("body")).screenshot({ path: out });
-console.log(JSON.stringify({ saved: out }));
+console.log(JSON.stringify({ saved: out, browser: where }));
 } finally { await browser.close(); }

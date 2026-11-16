@@ -1,0 +1,16 @@
+{
+  "base_commit": "17f7efbd33da5d391b760dc10a5e0e9343ae3ec5",
+  "snapshot": "/tmp/vv-fixed-candidate-wljc4hza",
+  "files": {
+    "package-lock.json": "005d3a09b2180f524a14d8c5fbf4856a1eb9ef03380cc68cfebb27c3614a440d",
+    "SKILL.md": "70ff26c14eaa501f94f83ef889235142de30e023ca526c9b4778ba9c920f9067",
+    "package.json": "a130b4c55bc6b140720b2a1d1a8bccb326c8b6e1bf4fd79b1883fbc359883fe6",
+    "scripts/composite.mjs": "b4c5bf493cca5cae6e6ca01244152c5acd0cb8d0a8f8cafa9079cc68e410882b",
+    "scripts/readiness.mjs": "015ce0b3369d1d658fb9e3305cf2183797e0f6421ddef5c9525c7b5f0e7fccc1",
+    "scripts/touch.mjs": "6d01d104f77aba9be7353d5a6789943ddadeb72b3c9e43c39ce75200c9f6aaf3",
+    "scripts/load-playwright.mjs": "4ca47409353f242992b00cf49d3796e9ed2c33e027c866b689b6f55ca2cc9b4b",
+    "scripts/install.sh": "a00b9a0c06c3fbc9f3203974834c71a0c27d34ab7cfc3c033345cbcb512fad7c",
+    "scripts/screenshot.mjs": "849180d390abc79044684c88d3de141c140c51e9f59e0d720d8320492613a5c8",
+    "scripts/doctor.mjs": "d27ee12f37375bba00b9c403624096b3a38453b2535d3125780c94cd27b8ce7e"
+  }
+}

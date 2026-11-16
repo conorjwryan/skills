@@ -2,7 +2,7 @@
 // Raw loadChromium/loadBrowser exports remain local-only for legacy callers.
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, realpathSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 
@@ -69,11 +69,15 @@ export async function launchBrowser(name, { backend = process.env.VISUAL_VERIFY_
   // A dedicated server per launch: Docker allocates the loopback host port atomically.
   // No shared fixed port, reuse race, or termination of another caller's server.
   const container = `visual-verify-${randomUUID()}`;
-  const server = `const {${name}:type}=require('/runtime/playwright');type.launchServer({...JSON.parse(process.env.VV_OPTIONS),port:3000,host:'0.0.0.0'}).then(s=>console.log(s.wsEndpoint())).catch(e=>{console.error(e);process.exit(1)});`;
+  const serverPath = `/${randomUUID()}`;
+  const serverLogs = () => {
+    const result = spawnSync('docker', ['logs', '--tail', '60', container], { encoding: 'utf8', timeout: 10000 });
+    return [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+  };
   installCleanup();
   owned.add(container);
   try {
-    docker(['run', '-d', '--rm', '--pull=never', '--init', '--ipc=host', '--user', 'pwuser', '--workdir', '/home/pwuser', '--label', 'visual-verify.managed=1', '--label', `visual-verify.version=${expectedVersion}`, '--name', container, '-p', '127.0.0.1::3000', '--mount', `type=bind,source=${realpathSync(root + 'node_modules')},target=/runtime,readonly`, '-e', `VV_OPTIONS=${JSON.stringify({ headless: true, ...launchOptions })}`, image, 'node', '-e', server]);
+    docker(['run', '-d', '--pull=never', '--init', '--ipc=host', '--user', 'pwuser', '--workdir', '/home/pwuser', '--label', 'visual-verify.managed=1', '--label', `visual-verify.version=${expectedVersion}`, '--name', container, '-p', '127.0.0.1::3000', '--mount', `type=bind,source=${realpathSync(root + 'node_modules')},target=/runtime/node_modules,readonly`, image, 'node', '/runtime/node_modules/playwright/cli.js', 'run-server', '--port', '3000', '--host', '0.0.0.0', '--path', serverPath, '--max-clients', '1', '--unsafe']);
     const info = JSON.parse(docker(['inspect', container]))[0];
     if (info.Config.Image !== image || info.Config.Labels['visual-verify.version'] !== expectedVersion) throw new Error('Container identity mismatch');
     const port = info.NetworkSettings.Ports['3000/tcp']?.find(p => p.HostIp === '127.0.0.1')?.HostPort;
@@ -81,17 +85,27 @@ export async function launchBrowser(name, { backend = process.env.VISUAL_VERIFY_
     const deadline = Date.now() + timeout;
     let endpoint;
     while (Date.now() < deadline) {
-      const logs = docker(['logs', container]);
+      const logs = serverLogs();
       const match = logs.match(/ws:\/\/[^\s]+/);
       if (match) { endpoint = new URL(match[0]); break; }
+      const state = JSON.parse(docker(['inspect', '--format', '{{json .State}}', container]));
+      if (!state.Running) throw new Error(`Server exited (${state.ExitCode}): ${logs}`);
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     if (!endpoint) throw new Error(`Server readiness timed out after ${timeout}ms`);
     endpoint.hostname = '127.0.0.1'; endpoint.port = port;
-    const browser = await pw[name].connect(endpoint.href, { timeout, exposeNetwork: '<loopback>' });
+    if (endpoint.pathname !== serverPath) throw new Error('Server endpoint identity mismatch');
+    const browser = await pw[name].connect(endpoint.href, {
+      timeout, exposeNetwork: '<loopback>',
+      headers: { 'x-playwright-launch-options': JSON.stringify({ headless: true, ...launchOptions, timeout }) },
+    });
     const close = browser.close.bind(browser);
     browser.close = async (...args) => { try { return await close(...args); } finally { remove(container); } };
     browser.on('disconnected', () => remove(container));
     return { browser, where: `docker (${container}, Playwright ${expectedVersion}, 127.0.0.1:${port})` };
-  } catch (error) { remove(container); throw new Error(`Docker ${name} failed: ${error.message}`); }
+  } catch (error) {
+    const logs = serverLogs();
+    remove(container);
+    throw new Error(`Docker ${name} failed: ${error.message}${logs ? `\nServer logs:\n${logs}` : ''}`);
+  }
 }

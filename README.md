@@ -54,4 +54,4 @@ The current Visual Verify version is **v1.1.0**. Version history in this reposit
 
 ## Verification records
 
-The [v1.1.0 verification plan and log](verification/visual-verify-1.1.0.md) lives outside the installable `visual-verify/` folder. It records claims, baseline comparisons and results separately from agent instructions. Browser validation is pending until after the implementation commit; package and syntax checks do not establish browser behaviour.
+The [v1.1.0 verification plan and log](verification/visual-verify-1.1.0.md) lives outside the installable `visual-verify/` folder. It records claims, baseline comparisons and results separately from agent instructions. The [final verification report](verification/visual-verify-1.1.0-verify-changes.md) records passing independent Linux Docker and local Chromium retests of the fixed v1.1.0 source snapshot. Platform limits and historical failures are retained in the reports.

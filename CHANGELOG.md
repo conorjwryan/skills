@@ -12,6 +12,7 @@ Changes to skills maintained in this repository are recorded here, grouped by sk
 - Replace shared-port browser servers with per-launch containers, Docker-assigned loopback ports, identity checks and owned-container cleanup. Forward client loopback traffic through Playwright.
 - Add bounded post-action selector/predicate readiness and optional animation settling to screenshot and touch checks; bound asynchronous evaluation and close browsers on command failure.
 - Report the actual WebKit startup error when falling back to Chromium.
+- Correct the Docker mount to preserve node_modules dependency resolution and use the full Playwright server for client loopback forwarding. Retain startup logs before cleanup and report composite backend provenance.
 - Add an external verification plan/log. Browser and cross-platform validation remain pending; no Postie integration is included.
 
 ## Visual Verify — 1.0.1 — 2026-11-16
