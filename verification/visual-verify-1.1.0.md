@@ -1,6 +1,6 @@
 # Visual Verify 1.1.0 verification plan and log
 
-Status: implementation ready for user review; browser comparison pending after Conor commits.
+Status: post-commit verification completed on 17f7efb. Docker acceptance failed; see [collated results](visual-verify-1.1.0-summary.md). Implementation fixes await Conor’s instruction.
 
 This directory is outside `visual-verify/`, so installing that skill does not include this log or its future harness. No harness skill entrypoint belongs here.
 
