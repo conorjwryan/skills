@@ -1,101 +1,97 @@
-// Resolve Playwright and start browsers.
-//
-// When Docker is available, browsers run inside Microsoft's Playwright image
-// (mcr.microsoft.com/playwright), which already contains Chromium, WebKit and
-// every system library they need. Nothing extra is installed on the host.
-// Without Docker, the locally installed Playwright browsers are used.
-// Set VISUAL_VERIFY_DOCKER=0 to force local browsers.
-import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
-import { execFileSync, execSync } from "node:child_process";
+// Supported API: launchBrowser(name, { backend, timeout, launchOptions }).
+// Raw loadChromium/loadBrowser exports remain local-only for legacy callers.
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
+import { existsSync, realpathSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 
+const root = fileURLToPath(new URL('../', import.meta.url));
 const require = createRequire(import.meta.url);
-const PORT = 39123;
+const manifest = require('../package.json');
+export const expectedVersion = manifest.dependencies.playwright;
+export const image = `mcr.microsoft.com/playwright:v${expectedVersion}-noble`;
+const owned = new Set();
+const docker = (args) => execFileSync('docker', args, { encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+function remove(name) {
+  try { docker(['rm', '-f', name]); owned.delete(name); } catch { /* exit hook retries; never touch unowned containers */ }
+}
+let cleanupInstalled = false;
+function installCleanup() {
+  if (cleanupInstalled) return;
+  cleanupInstalled = true;
+  process.once('exit', () => { for (const name of owned) remove(name); });
+  for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => {
+    for (const name of owned) remove(name);
+    process.exit(signal === 'SIGINT' ? 130 : 143);
+  });
+}
 
-function resolvePlaywright() {
+function runtime() {
+  const path = `${root}node_modules/playwright/package.json`;
+  if (!existsSync(path)) throw new Error(`Skill runtime missing. Run: bash ${JSON.stringify(root + 'scripts/install.sh')}`);
+  const installed = require(path).version;
+  if (installed !== expectedVersion) throw new Error(`Playwright ${installed} does not match pinned ${expectedVersion}. Rerun the skill installer.`);
+  return require(`${root}node_modules/playwright`);
+}
+// These exports intentionally do not start Docker or install missing dependencies.
+export function loadBrowser(name) { return runtime()[name]; }
+export function loadChromium() { return loadBrowser('chromium'); }
+export function loadDevices() { return runtime().devices; }
+export function diagnose() {
+  const result = { skillVersion: manifest.version, expectedVersion, image, runtimePath: `${root}node_modules/playwright`, docker: false, imagePresent: false, containers: [], repair: `bash ${JSON.stringify(root + 'scripts/install.sh')}` };
   try {
-    return { playwright: require("playwright"), version: require("playwright/package.json").version };
-  } catch {
-    try {
-      const root = execSync("npm root -g", { encoding: "utf8" }).trim();
-      return { playwright: require(`${root}/playwright`), version: require(`${root}/playwright/package.json`).version };
-    } catch (e) {
-      throw new Error(
-        `Playwright not found. Run: bash ${JSON.stringify(fileURLToPath(new URL("./install.sh", import.meta.url)))}\n` + String(e)
-      );
-    }
-  }
-}
-
-function loadPlaywright() {
-  return resolvePlaywright().playwright;
-}
-
-export function loadChromium() {
-  return loadPlaywright().chromium;
-}
-
-/** "chromium" or "webkit" (Safari's engine). */
-export function loadBrowser(name) {
-  return loadPlaywright()[name];
-}
-
-/** Playwright's phone and tablet presets, e.g. devices["iPhone 15"]. */
-export function loadDevices() {
-  return loadPlaywright().devices;
-}
-
-function dockerAvailable() {
-  if (process.env.VISUAL_VERIFY_DOCKER === "0") return false;
+    const pw = runtime();
+    result.runtimeReady = true;
+    result.browsers = Object.fromEntries(['chromium', 'webkit'].map(name => [name, { path: pw[name].executablePath(), exists: existsSync(pw[name].executablePath()) }]));
+  } catch (error) { result.runtimeReady = false; result.runtimeError = error.message; }
   try {
-    execFileSync("docker", ["info", "--format", "{{.ServerVersion}}"], { stdio: "ignore", timeout: 10000 });
-    return true;
-  } catch {
-    return false;
-  }
+    docker(['info', '--format', '{{.ServerVersion}}']); result.docker = true;
+    try { docker(['image', 'inspect', image]); result.imagePresent = true; } catch { /* missing image */ }
+    const rows = docker(['ps', '--filter', 'name=^visual-verify-', '--format', 'json']);
+    result.containers = rows.split('\n').filter(Boolean).map(line => JSON.parse(line));
+  } catch (error) { result.dockerError = error.message; }
+  return result;
 }
 
-/**
- * Starts (or reuses) a Playwright server container matching the local Playwright
- * version. Host networking lets it open localhost dev servers.
- */
-function ensureContainer(version) {
-  const name = `visual-verify-playwright-${version}`;
-  const running = execFileSync("docker", ["ps", "--filter", `name=^${name}$`, "--format", "{{.Names}}"], { encoding: "utf8" }).trim();
-  if (!running) {
-    execFileSync("docker", ["rm", "-f", name], { stdio: "ignore" });
-    execFileSync("docker", [
-      "run", "-d", "--rm", "--init", "--ipc=host", "--network", "host", "--name", name,
-      "--user", "pwuser", "--workdir", "/home/pwuser",
-      `mcr.microsoft.com/playwright:v${version}-noble`,
-      "/bin/sh", "-c", `npx -y playwright@${version} run-server --port ${PORT} --host 127.0.0.1`,
-    ], { stdio: ["ignore", "ignore", "inherit"], timeout: 15 * 60 * 1000 });
+export async function launchBrowser(name, { backend = process.env.VISUAL_VERIFY_DOCKER === '0' ? 'local' : 'auto', timeout = 30000, launchOptions = {} } = {}) {
+  if (!['chromium', 'webkit', 'firefox'].includes(name)) throw new Error(`Unsupported browser: ${name}`);
+  if (!['auto', 'docker', 'local'].includes(backend) || !Number.isFinite(timeout) || timeout <= 0) throw new Error('Invalid backend or timeout');
+  const pw = runtime();
+  let available = false;
+  if (backend !== 'local') { try { docker(['info', '--format', '{{.ServerVersion}}']); available = true; } catch { /* auto can use local */ } }
+  if (backend === 'docker' && !available) throw new Error('Docker unavailable; run doctor.mjs for diagnostics.');
+  if (!available) {
+    try { return { browser: await pw[name].launch({ headless: true, ...launchOptions, timeout }), where: `local (Playwright ${expectedVersion})` }; }
+    catch (error) { throw new Error(`Local ${name} failed. Run doctor.mjs and explicit setup; nothing was installed. ${error.message}`); }
   }
-  return name;
-}
-
-/**
- * Launches `name` ("chromium" or "webkit"). Returns { browser, where }, where
- * `where` says whether it ran in Docker or locally, for honest reporting.
- */
-export async function launchBrowser(name) {
-  const { playwright, version } = resolvePlaywright();
-  if (dockerAvailable()) {
-    const container = ensureContainer(version);
-    const endpoint = `ws://127.0.0.1:${PORT}/`;
-    // The first run downloads the image and the Playwright package; give it time.
-    const deadline = Date.now() + 5 * 60 * 1000;
-    let lastError;
+  try { docker(['image', 'inspect', image]); } catch { throw new Error(`Docker image missing: ${image}. Run the installer explicitly; launch does not pull images.`); }
+  // A dedicated server per launch: Docker allocates the loopback host port atomically.
+  // No shared fixed port, reuse race, or termination of another caller's server.
+  const container = `visual-verify-${randomUUID()}`;
+  const server = `const {${name}:type}=require('/runtime/playwright');type.launchServer({...JSON.parse(process.env.VV_OPTIONS),port:3000,host:'0.0.0.0'}).then(s=>console.log(s.wsEndpoint())).catch(e=>{console.error(e);process.exit(1)});`;
+  installCleanup();
+  owned.add(container);
+  try {
+    docker(['run', '-d', '--rm', '--pull=never', '--init', '--ipc=host', '--user', 'pwuser', '--workdir', '/home/pwuser', '--label', 'visual-verify.managed=1', '--label', `visual-verify.version=${expectedVersion}`, '--name', container, '-p', '127.0.0.1::3000', '--mount', `type=bind,source=${realpathSync(root + 'node_modules')},target=/runtime,readonly`, '-e', `VV_OPTIONS=${JSON.stringify({ headless: true, ...launchOptions })}`, image, 'node', '-e', server]);
+    const info = JSON.parse(docker(['inspect', container]))[0];
+    if (info.Config.Image !== image || info.Config.Labels['visual-verify.version'] !== expectedVersion) throw new Error('Container identity mismatch');
+    const port = info.NetworkSettings.Ports['3000/tcp']?.find(p => p.HostIp === '127.0.0.1')?.HostPort;
+    if (!port) throw new Error('No loopback endpoint allocated');
+    const deadline = Date.now() + timeout;
+    let endpoint;
     while (Date.now() < deadline) {
-      try {
-        const browser = await playwright[name].connect(endpoint, { timeout: 10000 });
-        return { browser, where: `docker (${container})` };
-      } catch (error) {
-        lastError = error;
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      }
+      const logs = docker(['logs', container]);
+      const match = logs.match(/ws:\/\/[^\s]+/);
+      if (match) { endpoint = new URL(match[0]); break; }
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
-    throw new Error(`The Playwright Docker server did not start. Check: docker logs ${container}\n${lastError}`);
-  }
-  return { browser: await playwright[name].launch(), where: "local" };
+    if (!endpoint) throw new Error(`Server readiness timed out after ${timeout}ms`);
+    endpoint.hostname = '127.0.0.1'; endpoint.port = port;
+    const browser = await pw[name].connect(endpoint.href, { timeout, exposeNetwork: '<loopback>' });
+    const close = browser.close.bind(browser);
+    browser.close = async (...args) => { try { return await close(...args); } finally { remove(container); } };
+    browser.on('disconnected', () => remove(container));
+    return { browser, where: `docker (${container}, Playwright ${expectedVersion}, 127.0.0.1:${port})` };
+  } catch (error) { remove(container); throw new Error(`Docker ${name} failed: ${error.message}`); }
 }

@@ -2,12 +2,12 @@
 name: visual-verify
 description: "Drive a real headless browser (Playwright: Chromium, or WebKit for iPhone; run in Playwright's Docker image when Docker is installed) to screenshot a running web app at a chosen device viewport, look at the result, and confirm something actually renders/works — or produce a labelled side-by-side BEFORE/AFTER composite for a visual change. Use whenever the user asks to visually verify something, see how a page/component looks, check a UI at a phone/tablet width, screenshot the app, get a before-and-after of a styling change, or test mobile touch on iOS/Android (touch-target sizes, tapping, dragging/resizing by finger). Works in any project. Uses the Playwright library via Node scripts in scripts/ — there is NO Playwright MCP here."
 metadata:
-  version: "1.0.1"
+  version: "1.1.0"
 ---
 
 # Visual verify
 
-Version: **1.0.1**. Versions before 1.0.0 are not tracked in this repository.
+Version: **1.1.0**. Versions before 1.0.0 are not tracked in this repository.
 
 Look at the **real running app** in a headless browser and report honestly on what you see.
 Two modes:
@@ -87,14 +87,57 @@ The bundled scripts are:
 "$VISUAL_VERIFY_DIR/scripts/touch.mjs"         # phone touch: tap, drag, target audit
 ```
 
-**Where the browser runs.** If Docker is installed, the scripts run browsers inside Microsoft's
-Playwright image (`mcr.microsoft.com/playwright:v<version>-noble`, matching the local Playwright
-version). It already has Chromium, WebKit and all their system libraries, so **never install
-extra system packages (e.g. `playwright install-deps`) for this skill — use Docker.** The
-container is named `visual-verify-playwright-<version>`, uses host networking so it can open
-`localhost` dev servers, and stays running for reuse (`docker stop` it to free memory). The first
-run downloads the image (~2 GB, about a minute). Without Docker, local Playwright browsers are
-used. `VISUAL_VERIFY_DOCKER=0` forces local. Every script's JSON says which was used (`browser`).
+**Runtime and browser setup.** This skill owns an exact Playwright dependency and lockfile.
+It never resolves a global or project Playwright package. Run the installer explicitly after
+installing or updating the skill; normal checks never download packages, images or browsers.
+Use Node.js 20+, npm and Bash. Do not install host system packages for this skill.
+
+**Where the browser runs.** With Docker available, each launch starts its own container from
+the exact matching, already installed Playwright image. Docker allocates a unique loopback
+port; the helper verifies its container identity and connects to that endpoint. The skill's
+installed Node dependencies are mounted read-only, so the server needs no package downloads.
+Playwright forwards loopback requests to the client, allowing local app URLs without host
+networking. Normal close, startup failure and handled termination clean up only that run's
+container. A hard kill or host crash may leave a labelled container; inspect ownership before
+explicit cleanup. No pre-existing containers are replaced or stopped. Docker Desktop/macOS
+networking still requires separate validation; do not claim it from a Linux check.
+
+Without Docker, the helper uses installed local browser binaries. Set `VISUAL_VERIFY_DOCKER=0`
+to force local mode; the launch API also accepts an explicit backend. JSON output names the
+actual backend and version.
+
+### Supported launcher for project scripts
+
+```js
+// Resolve this import relative to the installed skill directory.
+const { launchBrowser } = await import("<installed-skill>/scripts/load-playwright.mjs");
+const { browser, where } = await launchBrowser("chromium", {
+  backend: "auto", // auto, docker, local
+  timeout: 30000,
+  launchOptions: { headless: true },
+});
+try {
+  // Use browser.newContext(), etc. Report `where` with the evidence.
+} finally {
+  await browser.close();
+}
+```
+
+`launchOptions` go to local `launch` or Docker `launchServer`. Docker always owns the server
+host and port; host-specific executable paths and other machine-specific options are the
+caller's responsibility. Existing `loadChromium()` and `loadBrowser(name)` exports remain
+**local-only compatibility APIs**: they neither launch Docker nor repair missing browsers.
+Migrate callers deliberately rather than assuming setup changes their behaviour.
+
+Docker launches use a fresh, uniquely named server container for each call. Docker atomically
+allocates a loopback port; the client validates container metadata and connects to its reported
+WebSocket path. Playwright forwards client loopback traffic, preserving access to local dev apps
+without host networking. Containers are removed on close, startup failure and handled termination.
+This trades warm-server reuse for endpoint isolation; older shared-port containers are left alone.
+A forced kill or Docker failure can leave an orphan. Inspect doctor output and verify the exact
+container's ownership before explicitly removing it; never stop all matching processes/containers.
+Cross-platform Docker behaviour still requires independent validation.
+
 
 `screenshot.mjs` flags: `--url --out [--width 390] [--height 844] [--dpr 2] [--mobile]
 [--wait 2000] [--click "Text or selector"] [--scroll-bottom "sel"] [--eval "js"]
@@ -107,9 +150,22 @@ then a CSS selector — use it to reach a state behind a tab/menu/dialog.
 bash "$VISUAL_VERIFY_DIR/scripts/install.sh"
 ```
 
-Installs the Playwright library globally (the scripts need it even when browsers run in Docker)
-and, as a fallback for machines without Docker, the Chromium browser. It installs no system
-packages. The scripts resolve Playwright from a local `node_modules` or the global npm root.
+Installs the locked dependency into this skill's own `node_modules`. The default `auto` setup
+pulls the matching Docker image if Docker is available; otherwise it installs local Chromium.
+Pass `docker` or `local` to the installer to select explicitly. Local WebKit is not installed
+by this command. No global npm packages or system packages are changed.
+
+Inspect prerequisites without starting browsers, pulling images or changing containers:
+
+```sh
+node "$VISUAL_VERIFY_DIR/scripts/doctor.mjs"
+```
+
+Doctor reports the skill/runtime version, runtime path, local executable presence, Docker
+image availability and active Visual Verify containers/endpoints (including legacy names). Its exit status checks Chromium
+prerequisites for the selected default backend; it does not prove browser launch or WebKit
+availability. Installing files and successfully launching a browser are separate evidence.
+
 Verify with:
 
 ```sh
@@ -117,7 +173,36 @@ node "$VISUAL_VERIFY_DIR/scripts/screenshot.mjs" \
   --url https://example.com --out /tmp/_vv_check.png --width 390 --height 844
 ```
 
-If `/tmp/_vv_check.png` is written, you're good.
+Inspect the image and backend JSON to confirm that this smoke check worked.
+
+## Wait for the state being checked
+
+Screenshot and touch commands support these **post-action** options:
+
+- `--ready-selector "<selector>"`: wait for the first matching element to be visible.
+- `--ready-js "<expression>"`: poll until a page expression (including a promise) is truthy.
+- `--ready-timeout 10000`: positive readiness timeout in milliseconds; shared by the
+  selector and predicate waits. Also bounds `--eval` and `--report` evaluation separately.
+- `--settle 0`: optional nonnegative delay after readiness for animation.
+
+These conditions run after all clicks/taps, scrolling, evaluation and dragging, before audit
+and capture. Both conditions, when provided, must pass. A failure exits nonzero and does not
+write a new success screenshot (an existing output file is not removed). Choose unique output
+paths. `--wait` retains its legacy pre-action delay; fixed click/drag delays remain compatibility
+settles, not evidence of readiness. State what the selected condition proves.
+
+```sh
+node "$VISUAL_VERIFY_DIR/scripts/screenshot.mjs" \
+  --url "<local-app-url>" --out visual-checks/search-desktop.png \
+  --click "Search" --ready-selector "[data-search-results]" \
+  --ready-js "document.querySelectorAll('[data-result]').length > 0"
+```
+
+Use a condition specific to the expected new state, not a stale element already on the page.
+For intermediate steps requiring async results, use the launch API and Playwright locators
+with assertions between actions. If waiting for a response, register the wait before triggering
+its request and then assert the rendered state; a response alone does not prove rendering.
+Do not treat arbitrary delays or network-idle as completion guarantees for debounced apps.
 
 ## Output location
 

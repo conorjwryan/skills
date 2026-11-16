@@ -17,11 +17,14 @@
 // Prints a JSON summary. Always states which engine and input were really used.
 import { launchBrowser, loadDevices } from "./load-playwright.mjs";
 
+import { readinessArg, validateReadiness, waitForReady, evaluateBounded } from "./readiness.mjs";
+
 function parseArgs(argv) {
   const a = { taps: [] };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     const v = argv[i + 1];
+    if (readinessArg(a, k, v)) { i++; continue; }
     switch (k) {
       case "--device": a.device = v; i++; break;
       case "--engine": a.engine = v; i++; break;
@@ -43,6 +46,7 @@ function parseArgs(argv) {
 }
 
 const a = parseArgs(process.argv.slice(2));
+validateReadiness(a);
 if (!a.url || !a.out || !["iphone", "android"].includes(a.device)) {
   console.error("required: --device iphone|android, --url and --out");
   process.exit(2);
@@ -61,11 +65,12 @@ try {
 } catch (error) {
   if (engine !== "webkit") throw error;
   // Local WebKit needs system libraries most machines lack; Docker avoids that. Say so rather than pretend.
-  notes.push("WebKit could not start (no Docker, and local WebKit is missing system libraries), so this ran in " +
+  notes.push(`WebKit failed: ${error.message}. This ran in ` +
     "Chromium at iPhone size. Safari-only behaviour was NOT tested. Install Docker to test in WebKit.");
   engine = "chromium";
   ({ browser, where } = await launchBrowser("chromium"));
 }
+try {
 const { defaultBrowserType: _ignored, ...contextOptions } = descriptor;
 const ctx = await browser.newContext(engine === "webkit" ? contextOptions : { ...contextOptions, isMobile: true, hasTouch: true });
 const page = await ctx.newPage();
@@ -111,6 +116,7 @@ if (a.drag) {
   await page.waitForTimeout(300);
 }
 
+const readiness = await waitForReady(page, a);
 let targets = null;
 if (a.targets) {
   const min = a.min ?? (a.device === "iphone" ? 44 : 48);
@@ -143,7 +149,7 @@ if (a.targets) {
   notes.push("Sizes are each element's own box. A larger invisible hit area (e.g. a ::after) is not counted, so check flagged items by eye.");
 }
 
-const report = a.report ? await page.evaluate(a.report) : undefined;
+const report = a.report ? await evaluateBounded(page, a.report, a['ready-timeout']) : undefined;
 await page.screenshot({ path: a.out, fullPage: !!a.full });
 notes.push("System UI (keyboard, text magnifier, callout menus, haptics) never appears in an emulated browser. Check those on a real device.");
 
@@ -157,9 +163,10 @@ console.log(JSON.stringify({
   report,
   targets,
   pageErrors: errors,
+  readiness,
   notes,
 }, null, 2));
-await browser.close();
+} finally { await browser.close(); }
 
 function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

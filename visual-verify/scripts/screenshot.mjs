@@ -18,11 +18,14 @@
 // Exits non-zero on failure. Prints a small JSON summary on success.
 import { launchBrowser } from "./load-playwright.mjs";
 
+import { readinessArg, validateReadiness, waitForReady, evaluateBounded } from "./readiness.mjs";
+
 function parseArgs(argv) {
   const a = { clicks: [] };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     const v = argv[i + 1];
+    if (readinessArg(a, k, v)) { i++; continue; }
     switch (k) {
       case "--url": a.url = v; i++; break;
       case "--out": a.out = v; i++; break;
@@ -44,12 +47,14 @@ function parseArgs(argv) {
 }
 
 const a = parseArgs(process.argv.slice(2));
+validateReadiness(a);
 if (!a.url || !a.out) {
   console.error("required: --url and --out");
   process.exit(2);
 }
 
 const { browser, where } = await launchBrowser("chromium");
+try {
 const ctx = await browser.newContext({
   viewport: { width: a.width ?? 390, height: a.height ?? 844 },
   deviceScaleFactor: a.dpr ?? 2,
@@ -88,15 +93,16 @@ if (a.scrollBottom) {
   await page.waitForTimeout(200);
 }
 
-if (a.eval) await page.evaluate(a.eval);
+if (a.eval) await evaluateBounded(page, a.eval, a['ready-timeout']);
 
+const readiness = await waitForReady(page, a);
 const opts = { path: a.out };
 if (a.full) opts.fullPage = true;
 if (a.clip) opts.clip = { x: a.clip[0], y: a.clip[1], width: a.clip[2], height: a.clip[3] };
 await page.screenshot(opts);
 
-console.log(JSON.stringify({ saved: a.out, width: a.width ?? 390, height: a.height ?? 844, browser: where }));
-await browser.close();
+console.log(JSON.stringify({ saved: a.out, width: a.width ?? 390, height: a.height ?? 844, browser: where, readiness }));
+} finally { await browser.close(); }
 
 function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

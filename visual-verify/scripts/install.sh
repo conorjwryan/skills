@@ -1,25 +1,17 @@
 #!/usr/bin/env bash
-# One-time install for the visual-verify skill (run per machine).
-# Installs the Playwright library globally. Browsers run in Playwright's Docker
-# image when Docker is installed; otherwise a local Chromium is used.
-# Never installs system packages.
+# Explicit per-installation setup. No global npm or system-package changes.
 set -euo pipefail
-
-visual_verify_scripts_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-
-echo "Installing Playwright (global) ..."
-npm install -g playwright >/dev/null 2>&1 || npm install -g playwright
-
-if docker info >/dev/null 2>&1; then
-  version=$(node -p "require('$(npm root -g)/playwright/package.json').version")
-  echo "Docker found: pulling mcr.microsoft.com/playwright:v${version}-noble (Chromium + WebKit) ..."
+visual_verify_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+backend="${1:-auto}"
+case "$backend" in auto|docker|local) ;; *) echo 'Usage: install.sh [auto|docker|local]' >&2; exit 2 ;; esac
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm ci --prefix "$visual_verify_root" --ignore-scripts --no-audit --no-fund
+version="$(node -p "require(process.argv[1]).dependencies.playwright" "$visual_verify_root/package.json")"
+if [[ "$backend" != local ]] && docker info >/dev/null 2>&1; then
   docker pull "mcr.microsoft.com/playwright:v${version}-noble"
+elif [[ "$backend" == docker ]]; then
+  echo 'Docker requested but unavailable.' >&2; exit 1
 else
-  echo "Docker not found: installing local Chromium as a fallback (no WebKit / iPhone engine) ..."
-  npx --yes playwright install chromium
+  node "$visual_verify_root/node_modules/playwright/cli.js" install chromium
 fi
-
-echo
-echo "Done. Verify with:"
-printf '  node %q \\\n' "$visual_verify_scripts_dir/screenshot.mjs"
-echo "    --url https://example.com --out /tmp/_vv_check.png --width 390 --height 844"
+printf 'Setup complete. Inspect prerequisites: node %q\n' "$visual_verify_root/scripts/doctor.mjs"
+echo 'Setup does not prove a browser launch; run an explicit local-app smoke check next.'

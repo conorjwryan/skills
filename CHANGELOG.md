@@ -4,6 +4,16 @@ Changes to skills maintained in this repository are recorded here, grouped by sk
 
 ## Unreleased
 
+## Visual Verify — 1.1.0 — 2026-11-16
+
+- Pin Playwright 1.65.1 in a skill-owned package and lockfile; remove implicit global dependency resolution.
+- Add explicit Docker/local setup and read-only prerequisite diagnostics, with no downloads during ordinary launch.
+- Standardise `launchBrowser(name, options)` while retaining documented local-only compatibility exports.
+- Replace shared-port browser servers with per-launch containers, Docker-assigned loopback ports, identity checks and owned-container cleanup. Forward client loopback traffic through Playwright.
+- Add bounded post-action selector/predicate readiness and optional animation settling to screenshot and touch checks; bound asynchronous evaluation and close browsers on command failure.
+- Report the actual WebKit startup error when falling back to Chromium.
+- Add an external verification plan/log. Browser and cross-platform validation remain pending; no Postie integration is included.
+
 ## Visual Verify — 1.0.1 — 2026-11-16
 
 - Removed the CMSTron/Lakebed appendix and its project-specific development, authentication, and fixture instructions.
