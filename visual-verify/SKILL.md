@@ -2,12 +2,12 @@
 name: visual-verify
 description: "Drive a real headless browser (Playwright: Chromium, or WebKit for iPhone; run in Playwright's Docker image when Docker is installed) to screenshot a running web app at a chosen device viewport, look at the result, and confirm something actually renders/works — or produce a labelled side-by-side BEFORE/AFTER composite for a visual change. Use whenever the user asks to visually verify something, see how a page/component looks, check a UI at a phone/tablet width, screenshot the app, get a before-and-after of a styling change, or test mobile touch on iOS/Android (touch-target sizes, tapping, dragging/resizing by finger). Works in any project. Uses the Playwright library via Node scripts in scripts/ — there is NO Playwright MCP here."
 metadata:
-  version: "1.0.0"
+  version: "1.0.1"
 ---
 
 # Visual verify
 
-Version: **1.0.0**. Earlier versions are not tracked in this repository.
+Version: **1.0.1**. Versions before 1.0.0 are not tracked in this repository.
 
 Look at the **real running app** in a headless browser and report honestly on what you see.
 Two modes:
@@ -230,22 +230,3 @@ node "$S" --device iphone --url "<url>" --out visual-checks/<change>-iphone.png 
 Start the app the way this project does — check its README / CLAUDE.md / AGENTS.md / `package.json`
 scripts (e.g. `npm run dev`, `pnpm dev`, a `make` target) for the dev command and the local URL/port.
 Seed any fixtures the project documents. If a dev server is already running, just reuse its URL.
-
-### Appendix — if this is a Lakebed capsule (e.g. cmstron)
-
-```sh
-npx lakebed dev                                       # serves http://localhost:3000 (guest auth)
-node scripts/local-dev-content.mjs seed --port 3000   # seed the Writing Lab fixture
-```
-
-**No auth toggles needed.** The local dev guest is always `guest:local`, the tracked fixture is
-owned by `guest:local`, and the client treats the guest as signed-in on localhost — so a plain
-`npx lakebed dev` + seed drops you into the authenticated app with seeded content visible. This
-bypass is localhost-only; production still shows real guests the logged-out page, so there's nothing
-to revert.
-
-If seeding returns `{"error":"Not found"}`, the dev server booted as a different guest. Fix:
-`npx lakebed auth reset`, restart `npx lakebed dev`, then seed. To enlarge seeded data without
-touching the tracked fixture, copy it, add fields (keep `"ownerId": "guest:local"`), and seed the
-copy: `node scripts/local-dev-content.mjs seed --port 3000 --fixture /tmp/expanded.json`.
-Editor URL shape: `/sites/<siteId>/types/<typeId>/posts/<postId>` (ids via `npx lakebed db dump --port 3000`).

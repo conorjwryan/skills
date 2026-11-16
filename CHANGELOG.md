@@ -4,6 +4,12 @@ Changes to skills maintained in this repository are recorded here, grouped by sk
 
 ## Unreleased
 
+## Visual Verify — 1.0.1 — 2026-11-16
+
+- Removed the CMSTron/Lakebed appendix and its project-specific development, authentication, and fixture instructions.
+- Kept app startup guidance project-agnostic.
+- Updated the skill metadata, displayed version, and README to v1.0.1.
+
 ## Visual Verify — 1.0.0 — 2026-11-16
 
 Initial baseline in this repository. Previous versions and their history are not tracked here.
