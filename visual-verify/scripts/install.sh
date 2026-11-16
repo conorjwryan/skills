@@ -5,6 +5,8 @@
 # Never installs system packages.
 set -euo pipefail
 
+visual_verify_scripts_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
 echo "Installing Playwright (global) ..."
 npm install -g playwright >/dev/null 2>&1 || npm install -g playwright
 
@@ -19,5 +21,5 @@ fi
 
 echo
 echo "Done. Verify with:"
-echo "  node ~/.claude/skills/visual-verify/scripts/screenshot.mjs \\"
+printf '  node %q \\\n' "$visual_verify_scripts_dir/screenshot.mjs"
 echo "    --url https://example.com --out /tmp/_vv_check.png --width 390 --height 844"

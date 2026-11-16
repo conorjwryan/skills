@@ -5,6 +5,7 @@
 // every system library they need. Nothing extra is installed on the host.
 // Without Docker, the locally installed Playwright browsers are used.
 // Set VISUAL_VERIFY_DOCKER=0 to force local browsers.
+import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { execFileSync, execSync } from "node:child_process";
 
@@ -20,7 +21,7 @@ function resolvePlaywright() {
       return { playwright: require(`${root}/playwright`), version: require(`${root}/playwright/package.json`).version };
     } catch (e) {
       throw new Error(
-        "Playwright not found. Run: bash ~/.claude/skills/visual-verify/scripts/install.sh\n" + String(e)
+        `Playwright not found. Run: bash ${JSON.stringify(fileURLToPath(new URL("./install.sh", import.meta.url)))}\n` + String(e)
       );
     }
   }

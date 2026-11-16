@@ -1,9 +1,13 @@
 ---
 name: visual-verify
-description: Drive a real headless browser (Playwright: Chromium, or WebKit for iPhone; run in Playwright's Docker image when Docker is installed) to screenshot a running web app at a chosen device viewport, look at the result, and confirm something actually renders/works — or produce a labelled side-by-side BEFORE/AFTER composite for a visual change. Use whenever the user asks to visually verify something, see how a page/component looks, check a UI at a phone/tablet width, screenshot the app, get a before-and-after of a styling change, or test mobile touch on iOS/Android (touch-target sizes, tapping, dragging/resizing by finger). Works in any project. Uses the Playwright library via Node scripts in scripts/ — there is NO Playwright MCP here.
+description: "Drive a real headless browser (Playwright: Chromium, or WebKit for iPhone; run in Playwright's Docker image when Docker is installed) to screenshot a running web app at a chosen device viewport, look at the result, and confirm something actually renders/works — or produce a labelled side-by-side BEFORE/AFTER composite for a visual change. Use whenever the user asks to visually verify something, see how a page/component looks, check a UI at a phone/tablet width, screenshot the app, get a before-and-after of a styling change, or test mobile touch on iOS/Android (touch-target sizes, tapping, dragging/resizing by finger). Works in any project. Uses the Playwright library via Node scripts in scripts/ — there is NO Playwright MCP here."
+metadata:
+  version: "1.0.0"
 ---
 
 # Visual verify
+
+Version: **1.0.0**. Earlier versions are not tracked in this repository.
 
 Look at the **real running app** in a headless browser and report honestly on what you see.
 Two modes:
@@ -65,13 +69,22 @@ design change that applies at all widths, check **both desktop and mobile**.
 ## The scripts (run with Bash; there is no MCP)
 
 Don't look for a `browser_*` / Playwright MCP tool — it isn't installed. Everything runs through
-plain Node scripts. They live next to this file; reference them at the stable global path so the
-commands work from any project:
+plain Node scripts. Resolve the absolute directory containing this installed `SKILL.md`,
+then set `VISUAL_VERIFY_DIR` to that directory in your shell. This may be a project installation
+or a global installation; use the copy whose instructions you are reading, not a hardcoded
+global path. Keep the working directory at the app project root. Reuse this variable in each
+shell command (or set it again if shell state is not preserved):
+
+```sh
+VISUAL_VERIFY_DIR="/absolute/path/to/installed/visual-verify"
+```
+
+The bundled scripts are:
 
 ```
-~/.claude/skills/visual-verify/scripts/screenshot.mjs   # capture a URL → png
-~/.claude/skills/visual-verify/scripts/composite.mjs     # two pngs → labelled before/after
-~/.claude/skills/visual-verify/scripts/touch.mjs         # phone touch: tap, drag, target audit
+"$VISUAL_VERIFY_DIR/scripts/screenshot.mjs"   # capture a URL → png
+"$VISUAL_VERIFY_DIR/scripts/composite.mjs"     # two pngs → labelled before/after
+"$VISUAL_VERIFY_DIR/scripts/touch.mjs"         # phone touch: tap, drag, target audit
 ```
 
 **Where the browser runs.** If Docker is installed, the scripts run browsers inside Microsoft's
@@ -91,7 +104,7 @@ then a CSS selector — use it to reach a state behind a tab/menu/dialog.
 ### One-time install (per machine)
 
 ```sh
-bash ~/.claude/skills/visual-verify/scripts/install.sh
+bash "$VISUAL_VERIFY_DIR/scripts/install.sh"
 ```
 
 Installs the Playwright library globally (the scripts need it even when browsers run in Docker)
@@ -100,7 +113,7 @@ packages. The scripts resolve Playwright from a local `node_modules` or the glob
 Verify with:
 
 ```sh
-node ~/.claude/skills/visual-verify/scripts/screenshot.mjs \
+node "$VISUAL_VERIFY_DIR/scripts/screenshot.mjs" \
   --url https://example.com --out /tmp/_vv_check.png --width 390 --height 844
 ```
 
@@ -131,7 +144,7 @@ where `<viewport>` is `mobile` or `desktop`.
    *Running the app* below). `mkdir -p visual-checks`.
 2. Capture the state to check, reaching it with `--click` / `--eval` / `--scroll-bottom` if needed:
    ```sh
-   node ~/.claude/skills/visual-verify/scripts/screenshot.mjs \
+   node "$VISUAL_VERIFY_DIR/scripts/screenshot.mjs" \
      --url "<running app url>" --out visual-checks/<change>-mobile.png \
      --width 440 --height 800 --mobile --wait 2000
    ```
@@ -145,7 +158,7 @@ where `<viewport>` is `mobile` or `desktop`.
 1. Confirm scope and viewport(s). `mkdir -p visual-checks`. Pick the shared `<change>` prefix.
 2. **Capture AFTER** — the working tree already has the change:
    ```sh
-   node ~/.claude/skills/visual-verify/scripts/screenshot.mjs \
+   node "$VISUAL_VERIFY_DIR/scripts/screenshot.mjs" \
      --url "<running app url>" --out visual-checks/<change>-mobile-after.png \
      --width 440 --height 800 --mobile --wait 2000
    ```
@@ -158,7 +171,7 @@ where `<viewport>` is `mobile` or `desktop`.
    Wait for the dev server to hot-reload between toggle and shot (`--wait`).
 4. **Composite** — same prefix, `-before-after.png` suffix:
    ```sh
-   node ~/.claude/skills/visual-verify/scripts/composite.mjs \
+   node "$VISUAL_VERIFY_DIR/scripts/composite.mjs" \
      --before visual-checks/<change>-mobile-before.png --after visual-checks/<change>-mobile-after.png \
      --out visual-checks/<change>-mobile-before-after.png \
      --title "Header at 440px (iPhone width)" \
@@ -174,15 +187,15 @@ where `<viewport>` is `mobile` or `desktop`.
 `touch.mjs` drives a phone-shaped browser with touch input:
 
 ```sh
-S=~/.claude/skills/visual-verify/scripts/touch.mjs
+S="$VISUAL_VERIFY_DIR/scripts/touch.mjs"
 # Touch-target audit: undersized controls outlined red, sizes listed in the JSON
-node $S --device android --url "<url>" --out visual-checks/<change>-targets-android.png --targets
+node "$S" --device android --url "<url>" --out visual-checks/<change>-targets-android.png --targets
 # Finger-drag a handle and read back the result
-node $S --device android --url "<url>" --out visual-checks/<change>-drag-android.png \
+node "$S" --device android --url "<url>" --out visual-checks/<change>-drag-android.png \
   --tap "Open editor" --tap ".editor img" --drag ".resize-handle" --by -40,0 \
   --report "document.querySelector('.editor img').width"
 # iPhone (Safari engine)
-node $S --device iphone --url "<url>" --out visual-checks/<change>-iphone.png --targets
+node "$S" --device iphone --url "<url>" --out visual-checks/<change>-iphone.png --targets
 ```
 
 - `--device iphone` uses WebKit (Safari's engine) with an iPhone 15 preset; `android` uses
@@ -236,4 +249,3 @@ If seeding returns `{"error":"Not found"}`, the dev server booted as a different
 touching the tracked fixture, copy it, add fields (keep `"ownerId": "guest:local"`), and seed the
 copy: `node scripts/local-dev-content.mjs seed --port 3000 --fixture /tmp/expanded.json`.
 Editor URL shape: `/sites/<siteId>/types/<typeId>/posts/<postId>` (ids via `npx lakebed db dump --port 3000`).
-</content>
