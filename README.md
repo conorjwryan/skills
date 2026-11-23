@@ -49,10 +49,26 @@ Use `launchBrowser()` when integrating with project scripts. Legacy `loadChromiu
 
 Ask your agent to use Visual Verify against your local/dev app, for example: “Check this dialog at mobile and desktop widths” or “Show a before/after of this layout change.” See [the skill instructions](visual-verify/SKILL.md) for commands and limitations.
 
+## Docker Container Update — v1.0.0
+
+Docker Container Update audits compose-managed Docker apps for available updates and, only for the apps the user confirms, backs up, updates, tests and validates them.
+
+It supports:
+
+- A read-only audit that produces a markdown update table: pinned images, running containers, local digests vs Docker Hub, newest stable tags, and per-app versions read from inside the containers.
+- A **hard stop after the audit** — the skill never updates anything until the user explicitly names the apps to update, and carries exclusions through every phase without touching excluded stacks.
+- Cold backups into a dated `maintenance-YYYYMMDD` folder (named volumes, bind mounts, database dumps), verified by listing before anything is recreated.
+- Version-pinned compose updates one stack at a time, shared reverse proxies last, old images retained for rollback.
+- Validation from container version → startup logs → health endpoints → data intactness → live end-to-end (preview browser first, with an honest fallback), plus an indicators-of-compromise review of logs and app databases for internet-facing apps (n8n, nginx-proxy-manager, ntfy, WordPress), and integration with a project container-audit tool and its baseline workflow.
+
+The bundled `scripts/docker-update-check.sh` is the read-only audit helper; it changes nothing and pulls nothing. Ask your agent to “check the docker apps for updates”, “update n8n and ntfy”, or “review the containers for compromise indicators”. See [the skill instructions](docker-container-update/SKILL.md) for the full workflow.
+
 ## Versions and changes
 
-The current Visual Verify version is **v1.2.1**. Version history in this repository starts at **v1.0.0**. Earlier implementations existed elsewhere; their versions and history are not tracked here. Record future skill changes in [CHANGELOG.md](CHANGELOG.md), and keep the skill's `metadata.version` in step with releases.
+The current Visual Verify version is **v1.2.1** and the current Docker Container Update version is **v1.0.0**. Version history in this repository starts at **v1.0.0**. Earlier implementations existed elsewhere; their versions and history are not tracked here. Record future skill changes in [CHANGELOG.md](CHANGELOG.md), and keep the skill's `metadata.version` in step with releases.
 
 ## Verification records
 
 The [v1.1.0 verification plan and log](verification/visual-verify-1.1.0.md) lives outside the installable `visual-verify/` folder. It records claims, baseline comparisons and results separately from agent instructions. The [final verification report](verification/visual-verify-1.1.0-verify-changes.md) records passing independent Linux Docker and local Chromium retests of the fixed v1.1.0 source snapshot. Platform limits and historical failures are retained in the reports.
+
+The [Docker Container Update 1.0.0 verification record](verification/docker-container-update-1.0.0.md) documents the live update run the skill was extracted from, the audit script's checked results, the bugs fixed during verification, and the limits not exercised.

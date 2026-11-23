@@ -2,6 +2,17 @@
 
 Changes to skills maintained in this repository are recorded here, grouped by skill and version. Add upcoming changes under Unreleased, then assign a version and date when releasing them.
 
+## Docker Container Update — 1.0.0 — 2026-11-23
+
+Initial baseline in this repository, extracted from a live update run on caelum (n8n 2.47.4→2.48.7, nginx-proxy-manager 2.17.0→2.17.1, ntfy v2.37.2→v2.38.1).
+
+- Five-phase workflow: read-only audit → hard stop for user confirmation of exactly which apps to update → cold backups in a dated maintenance folder → one-stack-at-a-time version-pinned updates → test and validate.
+- Bundled read-only audit script (`scripts/docker-update-check.sh`): compose-dir inventory, local digest vs Docker Hub manifest-list digest, newest stable Hub tag (ignoring stale numeric major tags and arch/nightly suffixes), rolling-tag digest logic, markdown table output, `--compose-root` and `--exclude` options.
+- Validation ladder: in-container versions, startup logs, health endpoints (docker network → reverse proxy → public URL), data intactness per app, live end-to-end via preview browser with an honest fallback when unavailable.
+- Indicators-of-compromise review for internet-facing apps: access-log funnel analysis (probe status codes vs noise), n8n database audit (users, workflows, credentials, webhook→workflow mapping), nginx-proxy-manager proxy hosts and admin users, ntfy auth file, with app-specific recipes and benign-noise patterns.
+- Integration with a project container-audit tool (baseline → audit → update → audit → confirm-only-intentional-diff → refresh baseline).
+- Honesty rules: versions from inside containers, logs read not counted, digest semantics stated, nothing deleted (old images, backups, incident artifacts retained), excluded stacks untouched.
+
 ## Visual Verify — 1.2.1 — 2026-11-23
 
 - Bind preview-browser captures to the host project's evidence rules: copy captures into the project's named output directory and naming scheme instead of leaving them in the preview tool's artifact directory.
