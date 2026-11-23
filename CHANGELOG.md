@@ -2,7 +2,11 @@
 
 Changes to skills maintained in this repository are recorded here, grouped by skill and version. Add upcoming changes under Unreleased, then assign a version and date when releasing them.
 
-## Unreleased
+## Visual Verify — 1.2.0 — 2026-11-23
+
+- Prefer the host preview browser (e.g. T3 Code's `preview_*` tools) first, ahead of the Playwright scripts, for every check it can do; the scripts become the fallback. Avoids per-run Docker containers, pinned installs, port allocation and orphan-container cleanup.
+- Document the preview-to-script mapping: capture via `preview_snapshot`, viewports via `preview_resize` presets, interaction via `preview_act`, readiness via `preview_wait_for`, plus light/dark and recording extras.
+- Note the cases that still require the scripts: WebKit/Safari engine checks, the touch-target audit, full-page captures and DPR emulation. Composites run browser-free on preview screenshots.
 
 ## Visual Verify — 1.1.0 — 2026-11-16
 

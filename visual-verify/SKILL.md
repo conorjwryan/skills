@@ -1,13 +1,13 @@
 ---
 name: visual-verify
-description: "Drive a real headless browser (Playwright: Chromium, or WebKit for iPhone; run in Playwright's Docker image when Docker is installed) to screenshot a running web app at a chosen device viewport, look at the result, and confirm something actually renders/works — or produce a labelled side-by-side BEFORE/AFTER composite for a visual change. Use whenever the user asks to visually verify something, see how a page/component looks, check a UI at a phone/tablet width, screenshot the app, get a before-and-after of a styling change, or test mobile touch on iOS/Android (touch-target sizes, tapping, dragging/resizing by finger). Works in any project. Uses the Playwright library via Node scripts in scripts/ — there is NO Playwright MCP here."
+description: "Drive a real headless browser (Playwright: Chromium, or WebKit for iPhone; run in Playwright's Docker image when Docker is installed) to screenshot a running web app at a chosen device viewport, look at the result, and confirm something actually renders/works — or produce a labelled side-by-side BEFORE/AFTER composite for a visual change. Use whenever the user asks to visually verify something, see how a page/component looks, check a UI at a phone/tablet width, screenshot the app, get a before-and-after of a styling change, or test mobile touch on iOS/Android (touch-target sizes, tapping, dragging/resizing by finger). If the environment has a built-in preview browser (e.g. T3 Code's preview_* tools), use that first and fall back to the Playwright scripts only for what it cannot do. Works in any project. Uses the Playwright library via Node scripts in scripts/ — there is NO Playwright MCP here."
 metadata:
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Visual verify
 
-Version: **1.1.0**. Versions before 1.0.0 are not tracked in this repository.
+Version: **1.2.0**. Versions before 1.0.0 are not tracked in this repository.
 
 Look at the **real running app** in a headless browser and report honestly on what you see.
 Two modes:
@@ -21,6 +21,40 @@ Two modes:
 
 Pick the mode from what the user asked. "Does this look right / is it working / show me at phone
 width" → verify. "Before and after / did this fix it visually" → before/after.
+
+## Use the host preview browser first — before the scripts
+
+If the environment provides a built-in preview browser (e.g. T3 Code's `preview_*` tools, or an
+in-app browser pane with snapshot/screenshot support), **use it first, ahead of these scripts,
+for every check it can do.** The scripts below are the fallback for what it cannot do. The
+preview browser needs no Docker container, no pinned Playwright install and no
+`install.sh`/doctor setup — the host already runs one shared browser, so there is nothing to
+launch, port-allocate or clean up, and no orphaned containers to hunt down.
+
+Equivalent mapping:
+
+- **Capture** — open the URL (`preview_open` / `preview_navigate`), wait for load, then
+  `preview_snapshot` with `save: true` (returns a `screenshotPath` you can embed with Markdown).
+- **Viewports** — `preview_resize` with presets (iPhone SE/XR/12 Pro/14 Pro Max/15 Pro, Pixel 7/8,
+  Galaxy S24, iPad mini/Air/Pro, desktop 1920×1080 / 1440×900 …) or freeform 240–3840 px.
+  Caveat: it changes CSS size only — no DPR emulation and no user-agent change, so `css_width =
+  pixels / DPR` reasoning above still applies to screenshots the *user* sends, not to these captures.
+- **Interaction** — `preview_act` (click, type, hover, scroll, press, drag) replaces `--click`
+  and `--eval`; `preview_wait_for` (selector / text / URL conditions) replaces
+  `--ready-selector` / `--ready-js` and is a real wait, not a fixed `--wait` delay.
+- **Extras** — `preview_set_appearance` for light/dark; `preview_recording_start`/`stop` for video.
+
+Keep the scripts for what the preview browser cannot do:
+
+- **WebKit/Safari engine checks** (`touch.mjs --device iphone`) — the preview is Chromium;
+  Safari-only behaviour still needs the Playwright path (with the same real-device caveats).
+- **The automated touch-target audit** (`--targets`) and programmatic finger-drag gestures.
+- **Full-page captures** and `--dpr` devicePixelRatio emulation.
+- **Composites need no browser**: capture before/after with the preview tools, then run
+  `composite.mjs` on the two PNGs — it is pure image processing.
+
+Honesty rules apply unchanged: read every capture before reporting, and say plainly which tool
+produced an image.
 
 ## When the user asks, do it
 
