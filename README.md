@@ -2,7 +2,7 @@
 
 Custom agent skills for Claude Code, Codex, and other compatible agents.
 
-## Visual Verify — v1.2.0
+## Visual Verify — v1.2.1
 
 Visual Verify checks a real running web app using Playwright. It captures screenshots at desktop or mobile sizes, guides the agent to inspect the images, and reports what actually works or needs attention.
 
@@ -51,7 +51,7 @@ Ask your agent to use Visual Verify against your local/dev app, for example: “
 
 ## Versions and changes
 
-The current Visual Verify version is **v1.2.0**. Version history in this repository starts at **v1.0.0**. Earlier implementations existed elsewhere; their versions and history are not tracked here. Record future skill changes in [CHANGELOG.md](CHANGELOG.md), and keep the skill's `metadata.version` in step with releases.
+The current Visual Verify version is **v1.2.1**. Version history in this repository starts at **v1.0.0**. Earlier implementations existed elsewhere; their versions and history are not tracked here. Record future skill changes in [CHANGELOG.md](CHANGELOG.md), and keep the skill's `metadata.version` in step with releases.
 
 ## Verification records
 

@@ -2,6 +2,12 @@
 
 Changes to skills maintained in this repository are recorded here, grouped by skill and version. Add upcoming changes under Unreleased, then assign a version and date when releasing them.
 
+## Visual Verify — 1.2.1 — 2026-11-23
+
+- Bind preview-browser captures to the host project's evidence rules: copy captures into the project's named output directory and naming scheme instead of leaving them in the preview tool's artifact directory.
+- State that project-mandated check runners and explicit check commands take precedence over ad-hoc preview captures, and that preview captures carry no backend/version provenance — report which capture path was used.
+- Fall back to the scripts and say so when the preview browser is unavailable or lacks what a check needs; availability varies by environment and over time.
+
 ## Visual Verify — 1.2.0 — 2026-11-23
 
 - Prefer the host preview browser (e.g. T3 Code's `preview_*` tools) first, ahead of the Playwright scripts, for every check it can do; the scripts become the fallback. Avoids per-run Docker containers, pinned installs, port allocation and orphan-container cleanup.

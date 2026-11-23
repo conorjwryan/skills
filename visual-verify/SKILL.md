@@ -2,12 +2,12 @@
 name: visual-verify
 description: "Drive a real headless browser (Playwright: Chromium, or WebKit for iPhone; run in Playwright's Docker image when Docker is installed) to screenshot a running web app at a chosen device viewport, look at the result, and confirm something actually renders/works — or produce a labelled side-by-side BEFORE/AFTER composite for a visual change. Use whenever the user asks to visually verify something, see how a page/component looks, check a UI at a phone/tablet width, screenshot the app, get a before-and-after of a styling change, or test mobile touch on iOS/Android (touch-target sizes, tapping, dragging/resizing by finger). If the environment has a built-in preview browser (e.g. T3 Code's preview_* tools), use that first and fall back to the Playwright scripts only for what it cannot do. Works in any project. Uses the Playwright library via Node scripts in scripts/ — there is NO Playwright MCP here."
 metadata:
-  version: "1.2.0"
+  version: "1.2.1"
 ---
 
 # Visual verify
 
-Version: **1.2.0**. Versions before 1.0.0 are not tracked in this repository.
+Version: **1.2.1**. Versions before 1.0.0 are not tracked in this repository.
 
 Look at the **real running app** in a headless browser and report honestly on what you see.
 Two modes:
@@ -30,6 +30,19 @@ for every check it can do.** The scripts below are the fallback for what it cann
 preview browser needs no Docker container, no pinned Playwright install and no
 `install.sh`/doctor setup — the host already runs one shared browser, so there is nothing to
 launch, port-allocate or clean up, and no orphaned containers to hunt down.
+
+Three project rules still bind when you capture with the preview browser:
+
+- **Follow the host project's evidence rules.** If the project names an output directory and
+  naming scheme for check images (e.g. a versioned `visual-checks/` folder), copy preview
+  captures there under that scheme — do not leave them in the preview tool's own artifact
+  directory.
+- **Project-mandated check runners win.** If the project's docs name explicit check commands or
+  runners (which may use this skill's `launchBrowser` and cannot run through the preview),
+  run those as specified instead of substituting ad-hoc preview captures.
+- **Fall back and say so.** If the preview browser is unavailable or lacks what a check needs,
+  use the scripts and report which path you used. Preview captures carry no
+  backend/version provenance, so say plainly that an image came from the preview browser.
 
 Equivalent mapping:
 
